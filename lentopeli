@@ -1,0 +1,867 @@
+from geopy import distance
+import mysql.connector
+import sys
+
+
+def matkan_mittaus(x, y):
+    global total_km
+    tulos = distance.great_circle(x, y).km
+    tulos = round(tulos)
+    total_km = total_km + tulos
+    kenttien_tarkistus()
+
+
+def lenna_kotiin():
+    global total_km
+    kursori = yhteys.cursor()
+    sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+    kursori.execute(sql)
+    sql3 = kursori.fetchone()
+    sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident = 'EFHK'"
+    kursori.execute(sql2)
+    sql4 = kursori.fetchone()
+    tulos = distance.great_circle(sql3, sql4).km
+    tulos = round(tulos)
+    total_km = total_km + tulos
+    print("")
+    print("\nPalaat takaisin Helsinki-Vantaan lentokentälle...")
+    print("")
+    print(f"Kävit kaikilla mantereilla vähintään kerran ja lentokilometrisi ovat: {total_km} kilometriä!")
+    sys.exit()
+
+
+def kenttien_tarkistus():
+    global user
+    kursori = yhteys.cursor()
+    sql = "SELECT aasia, eurooppa, oseania, afrikka, na, sa FROM game WHERE screen_name = %s"
+    kursori.execute(sql, [user])
+    sql1 = kursori.fetchall()
+    x = sql1[0].count(1)
+    if x == 6:
+        lenna_kotiin()
+    else:
+        valinta()
+
+
+def luo_tunnus(screen_name, password):
+    sql = "INSERT INTO game (screen_name, password) VALUES(%s, %s)"
+    val = (screen_name, password)
+    kursori = yhteys.cursor()
+    kursori.execute(sql, val)
+    if kursori.rowcount == 1:
+        print("Käyttäjätunnus luotu!\n")
+        aloitus()
+
+
+def kirjaudu(screen_name, password):
+    sql = "SELECT * FROM game WHERE screen_name = %s and password = %s"
+    val = (screen_name, password)
+    kursori = yhteys.cursor()
+    kursori.execute(sql, val)
+
+    if kursori.fetchone() is None:
+        print("\nVäärä käyttäjätunnus tai salasana, tarkista tiedot tai luo uusi tunnus!\n")
+        aloitus()
+    else:
+        print("Kirjauduit sisään!\n")
+        reset = "UPDATE game SET location=default, aasia=default, eurooppa=default, afrikka=default, oseania=default, na=default, sa=default WHERE screen_name = %s"
+        kursori.execute(reset, [user])
+        menu()
+
+
+def aloitus():
+    aloita_peli = input("[L]uo uusi käyttäjä, [K]irjaudu sisään tai lopeta peli painamalla [Q]: ")
+
+    if aloita_peli == "L" or aloita_peli == "l":
+        screen_name = str(input("Syötä käyttäjätunnus: "))
+        password = str(input("Syötä salasana: "))
+        luo_tunnus(screen_name, password)
+
+    elif aloita_peli == "K" or aloita_peli == "k":
+        screen_name = str(input("Kirjaudu sisään syöttämällä käyttäjätunnus: "))
+        password = str(input("Syötä salasana: "))
+        global user
+        user = screen_name
+        kirjaudu(screen_name, password)
+
+
+    elif aloita_peli == "Q" or aloita_peli == "q":
+        print("Lopetetaan peli...")
+        sys.exit()
+
+    else:
+        print("Jokin meni pieleen, yritä uudelleen!")
+        aloitus()
+
+
+def menu():
+    print()
+    print("Aloita uusi peli [U] \nOhjeet [O] \nLopeta peli [Q]\n")
+    print()
+    toiminto = input("Valitse vaihtoehto: ")
+
+    if toiminto == "U" or toiminto == "u":
+        valinta()
+
+    elif toiminto == "O" or toiminto == "o":
+        print()
+        print("Ohjeet: \nPelin tavoitteena on käydä jokaisella mantereella: Aasia , Afrikka, Oseania, Etelä-Amerikka, Eurooppa, Pohjois-Amerikka.")
+        print("Aloitat pelin Helsinki-Vantaan lentokentältä, vaikka se sijaitseekin Euroopassa, sinun tulee käydä jossain toisessa Euroopan maassa.")
+        print("Peli tarjoaa sinulle ensiksi valittavaksi seuraavan mantereen ja satunnaisesti halutulta mantereelta viisi eri lentokenttää.")
+        print("Sinun tavoitteena on yrittää päästä mahdollisimman pienin päästöin peli lävitse. Pelin komennot ovat suluissa ja sinun tulee valita kirjain tai numero ja edetä sen jälkeen painamalla enteriä. ")
+        print()
+        menu()
+
+    elif toiminto == "Q" or toiminto == "q":
+        sys.exit()
+
+    else:
+        print("Jotain meni pieleen, yritä uudelleen.")
+        menu()
+
+
+def valinta():
+    print("Mille mantereelle haluaisit lentää seuraavaksi?")
+    print("[1] Aasia, [2] Eurooppa, [3] Afrikka, [4] Oseania ,[5] Pohjois-Amerikka,[6] Etelä-Amerikka, [P] Palaa valikkoon, [Q] Lopeta peli")
+    valitse = input("Valitse haluamasi toiminto: ")
+
+    if valitse == "1":
+        as_kentta()
+
+    elif valitse == "2":
+        eu_kentta()
+
+    elif valitse == "3":
+        af_kentta()
+
+    elif valitse == "4":
+        oc_kentta()
+
+    elif valitse == "5":
+        na_kentta()
+
+    elif valitse == "6":
+        sa_kentta()
+
+    elif valitse == "p" or valitse == "P":
+        menu()
+
+    elif valitse == "q" or valitse == "Q":
+        sys.exit()
+
+    else:
+        print("Jokin meni pieleen, yritä uudelleen.")
+        valinta()
+
+
+def as_kentta():
+    print()
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'AS' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos1 = kursori.fetchone()
+    print(f"{tulos1} [1]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'AS' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos2 = kursori.fetchone()
+    print(f"{tulos2} [2]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'AS' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos3 = kursori.fetchone()
+    print(f"{tulos3} [3]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'AS' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos4 = kursori.fetchone()
+    print(f"{tulos4} [4]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'AS' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos5 = kursori.fetchone()
+    print(f"{tulos5} [5]\n")
+
+
+    valitse_as_kentta = input("Valitse haluamasi lentokenttä: ")
+
+    if valitse_as_kentta == "1":
+        print(f"Lensit {tulos1} kentälle")
+        aasia_done = "UPDATE flight_game.game t SET t.aasia = true WHERE screen_name = %s"
+        kursori.execute(aasia_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos1)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos1)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+
+    elif valitse_as_kentta == "2":
+        print(f"Lensit {tulos2} kentälle")
+        aasia_done = "UPDATE flight_game.game t SET t.aasia = true WHERE screen_name = %s"
+        kursori.execute(aasia_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos2)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos2)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+
+    elif valitse_as_kentta == "3":
+        print(f"Lensit {tulos3} kentälle")
+        aasia_done = "UPDATE flight_game.game t SET t.aasia = true WHERE screen_name = %s"
+        kursori.execute(aasia_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos3)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos3)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+
+    elif valitse_as_kentta == "4":
+        print(f"Lensit {tulos4} kentälle")
+        aasia_done = "UPDATE flight_game.game t SET t.aasia = true WHERE screen_name = %s"
+        kursori.execute(aasia_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos4)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos4)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+
+    elif valitse_as_kentta == "5":
+        print(f"Lensit {tulos5} kentälle")
+        aasia_done = "UPDATE flight_game.game t SET t.aasia = true WHERE screen_name = %s"
+        kursori.execute(aasia_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos5)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos5)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+
+
+def eu_kentta():
+    print()
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'EU' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos1 = kursori.fetchone()
+    print(f"{tulos1} [1]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'EU' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos2 = kursori.fetchone()
+    print(f"{tulos2} [2]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'EU' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos3 = kursori.fetchone()
+    print(f"{tulos3} [3]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'EU' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos4 = kursori.fetchone()
+    print(f"{tulos4} [4]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'EU' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos5 = kursori.fetchone()
+    print(f"{tulos5} [5]\n")
+
+    valitse_eu_kentta = input("Valitse haluamasi lentokenttä: ")
+
+    if valitse_eu_kentta == "1":
+        print(f"Lensit {tulos1} kentälle")
+        eurooppa_done = "UPDATE flight_game.game t SET t.eurooppa = true WHERE screen_name = %s"
+        kursori.execute(eurooppa_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos1)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos1)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_eu_kentta == "2":
+        print(f"Lensit {tulos2} kentälle")
+        eurooppa_done = "UPDATE flight_game.game t SET t.eurooppa = true WHERE screen_name = %s"
+        kursori.execute(eurooppa_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos2)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos2)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_eu_kentta == "3":
+        print(f"Lensit {tulos3} kentälle")
+        eurooppa_done = "UPDATE flight_game.game t SET t.eurooppa = true WHERE screen_name = %s"
+        kursori.execute(eurooppa_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos3)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos3)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_eu_kentta == "4":
+        print(f"Lensit {tulos4} kentälle")
+        eurooppa_done = "UPDATE flight_game.game t SET t.eurooppa = true WHERE screen_name = %s"
+        kursori.execute(eurooppa_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos4)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos4)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_eu_kentta == "5":
+        print(f"Lensit {tulos5} kentälle")
+        eurooppa_done = "UPDATE flight_game.game t SET t.eurooppa = true WHERE screen_name = %s"
+        kursori.execute(eurooppa_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos5)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos5)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+
+def af_kentta():
+    print()
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'AF' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos1 = kursori.fetchone()
+    print(f"{tulos1} [1]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'AF' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos2 = kursori.fetchone()
+    print(f"{tulos2} [2]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'AF' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos3 = kursori.fetchone()
+    print(f"{tulos3} [3]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'AF' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos4 = kursori.fetchone()
+    print(f"{tulos4} [4]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'AF' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos5 = kursori.fetchone()
+    print(f"{tulos5} [5]\n")
+
+    valitse_af_kentta = input("Valitse haluamasi lentokenttä: ")
+
+    if valitse_af_kentta == "1":
+        print(f"Lensit {tulos1} kentälle")
+        afrikka_done = "UPDATE flight_game.game t SET t.afrikka = true WHERE screen_name = %s"
+        kursori.execute(afrikka_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos1)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos1)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_af_kentta == "2":
+        print(f"Lensit {tulos2} kentälle")
+        afrikka_done = "UPDATE flight_game.game t SET t.afrikka = true WHERE screen_name = %s"
+        kursori.execute(afrikka_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos2)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos2)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_af_kentta == "3":
+        print(f"Lensit {tulos3} kentälle")
+        afrikka_done = "UPDATE flight_game.game t SET t.afrikka = true WHERE screen_name = %s"
+        kursori.execute(afrikka_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos3)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos3)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_af_kentta == "4":
+        print(f"Lensit {tulos4} kentälle")
+        afrikka_done = "UPDATE flight_game.game t SET t.afrikka = true WHERE screen_name = %s"
+        kursori.execute(afrikka_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos4)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos4)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_af_kentta == "5":
+        print(f"Lensit {tulos5} kentälle")
+        afrikka_done = "UPDATE flight_game.game t SET t.afrikka = true WHERE screen_name = %s"
+        kursori.execute(afrikka_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos5)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos5)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+
+def oc_kentta():
+    print()
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'OC' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos1 = kursori.fetchone()
+    print(f"{tulos1} [1]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'OC' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos2 = kursori.fetchone()
+    print(f"{tulos2} [2]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'OC' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos3 = kursori.fetchone()
+    print(f"{tulos3} [3]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'OC' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos4 = kursori.fetchone()
+    print(f"{tulos4} [4]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'OC' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos5 = kursori.fetchone()
+    print(f"{tulos5} [5]\n")
+
+    valitse_oc_kentta = input("Valitse haluamasi lentokenttä: ")
+
+    if valitse_oc_kentta == "1":
+        print(f"Lensit {tulos1} kentälle")
+        oseania_done = "UPDATE flight_game.game t SET t.oseania = true WHERE screen_name = %s"
+        kursori.execute(oseania_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos1)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos1)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_oc_kentta == "2":
+        print(f"Lensit {tulos2} kentälle")
+        oseania_done = "UPDATE flight_game.game t SET t.oseania = true WHERE screen_name = %s"
+        kursori.execute(oseania_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos2)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos2)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_oc_kentta == "3":
+        print(f"Lensit {tulos3} kentälle")
+        oseania_done = "UPDATE flight_game.game t SET t.oseania = true WHERE screen_name = %s"
+        kursori.execute(oseania_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos3)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos3)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_oc_kentta == "4":
+        print(f"Lensit {tulos4} kentälle")
+        oseania_done = "UPDATE flight_game.game t SET t.oseania = true WHERE screen_name = %s"
+        kursori.execute(oseania_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos4)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos4)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_oc_kentta == "5":
+        print(f"Lensit {tulos5} kentälle")
+        oseania_done = "UPDATE flight_game.game t SET t.oseania = true WHERE screen_name = %s"
+        kursori.execute(oseania_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos5)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos5)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+
+def na_kentta():
+    print()
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'NA' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos1 = kursori.fetchone()
+    print(f"{tulos1} [1]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'NA' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos2 = kursori.fetchone()
+    print(f"{tulos2} [2]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'NA' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos3 = kursori.fetchone()
+    print(f"{tulos3} [3]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'NA' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos4 = kursori.fetchone()
+    print(f"{tulos4} [4]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'NA' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos5 = kursori.fetchone()
+    print(f"{tulos5} [5]\n")
+
+    valitse_na_kentta = input("Valitse haluamasi lentokenttä: ")
+
+    if valitse_na_kentta == "1":
+        print(f"Lensit {tulos1} kentälle")
+        na_done = "UPDATE flight_game.game t SET t.na = true WHERE screen_name = %s"
+        kursori.execute(na_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos1)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos1)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_na_kentta == "2":
+        print(f"Lensit {tulos2} kentälle")
+        na_done = "UPDATE flight_game.game t SET t.na = true WHERE screen_name = %s"
+        kursori.execute(na_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos2)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos2)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_na_kentta == "3":
+        print(f"Lensit {tulos3} kentälle")
+        na_done = "UPDATE flight_game.game t SET t.na = true WHERE screen_name = %s"
+        kursori.execute(na_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos3)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos3)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_na_kentta == "4":
+        print(f"Lensit {tulos4} kentälle")
+        na_done = "UPDATE flight_game.game t SET t.na = true WHERE screen_name = %s"
+        kursori.execute(na_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos4)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos4)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_na_kentta == "5":
+        print(f"Lensit {tulos5} kentälle")
+        na_done = "UPDATE flight_game.game t SET t.na = true WHERE screen_name = %s"
+        kursori.execute(na_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos5)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos5)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+
+def sa_kentta():
+    print()
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'SA' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos1 = kursori.fetchone()
+    print(f"{tulos1} [1]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'SA' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos2 = kursori.fetchone()
+    print(f"{tulos2} [2]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'SA' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos3 = kursori.fetchone()
+    print(f"{tulos3} [3]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'SA' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos4 = kursori.fetchone()
+    print(f"{tulos4} [4]\n")
+
+    kursori = yhteys.cursor()
+    kursori.execute("SELECT name FROM airport WHERE continent = 'SA' and type = 'large_airport' ORDER BY RAND() limit 1;")
+    tulos5 = kursori.fetchone()
+    print(f"{tulos5} [5]\n")
+
+    valitse_sa_kentta = input("Valitse haluamasi lentokenttä: ")
+
+    if valitse_sa_kentta == "1":
+        print(f"Lensit {tulos1} kentälle")
+        sa_done = "UPDATE flight_game.game t SET t.sa = true WHERE screen_name = %s"
+        kursori.execute(sa_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos1)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos1)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_sa_kentta == "2":
+        print(f"Lensit {tulos2} kentälle")
+        sa_done = "UPDATE flight_game.game t SET t.sa = true WHERE screen_name = %s"
+        kursori.execute(sa_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos2)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos2)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_sa_kentta == "3":
+        print(f"Lensit {tulos3} kentälle")
+        sa_done = "UPDATE flight_game.game t SET t.sa = true WHERE screen_name = %s"
+        kursori.execute(sa_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos3)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos3)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_sa_kentta == "4":
+        print(f"Lensit {tulos4} kentälle")
+        sa_done = "UPDATE flight_game.game t SET t.sa = true WHERE screen_name = %s"
+        kursori.execute(sa_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos4)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos4)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+    elif valitse_sa_kentta == "5":
+        print(f"Lensit {tulos5} kentälle")
+        sa_done = "UPDATE flight_game.game t SET t.sa = true WHERE screen_name = %s"
+        kursori.execute(sa_done, [user])
+        sql = "SELECT latitude_deg, longitude_deg FROM airport WHERE name = %s"
+        kursori.execute(sql, tulos5)
+        sql1 = kursori.fetchall()
+        sql2 = "SELECT latitude_deg, longitude_deg FROM airport WHERE ident in (select location FROM game);"
+        kursori.execute(sql2)
+        sql2 = kursori.fetchall()
+        loc = "SELECT ident FROM airport WHERE name = %s"
+        kursori.execute(loc, tulos5)
+        loc2 = kursori.fetchall()
+        sql3 = "UPDATE game SET location = %s WHERE screen_name = 'toni'"
+        kursori.execute(sql3, loc2[0])
+        matkan_mittaus(sql1, sql2)
+
+
+yhteys = mysql.connector.connect(
+    host="127.0.0.1",
+    port=3306,
+    database="flight_game",
+    user="root",
+    password="lentokone",
+    autocommit=True
+    )
+
+print("Tervetuloa lentosimulaatioon!")
+print()
+user = tuple
+tulos = str
+total_km = int(0)
+aloitus()
